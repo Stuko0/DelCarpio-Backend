@@ -1,3 +1,5 @@
+# Local Postgres for development only.
+# Production uses Supabase cloud — Render deploys via Dockerfile.
 services:
   postgres:
     image: postgres:17-alpine
