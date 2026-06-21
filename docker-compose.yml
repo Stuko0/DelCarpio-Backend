@@ -17,29 +17,5 @@ services:
       timeout: 5s
       retries: 5
 
-  pocketbase:
-    build: .
-    container_name: delcarpio-pb
-    restart: unless-stopped
-    ports:
-      - "8090:8090"
-    environment:
-      POSTGRES_URL: "postgres://user:***@postgres:5432/delcarpio?sslmode=disable"
-      POSTGRES_DATA_DB: pb-data
-      POSTGRES_AUX_DB: pb-auxiliary
-      PB_DATA_DIR: /pb_data
-      PB_PUBLIC_DIR: /pb_public
-      PB_HOOKS_DIR: /pb_hooks
-      PB_ALLOWED_ORIGINS: "http://localhost:4321,http://localhost:5173,http://localhost:8090"
-    volumes:
-      - pb_data:/pb_data
-      - pb_public:/pb_public
-      - ./pb_hooks:/pb_hooks
-    depends_on:
-      postgres:
-        condition: service_healthy
-
 volumes:
   pg_data:
-  pb_data:
-  pb_public:

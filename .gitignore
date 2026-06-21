@@ -1,10 +1,8 @@
 # ── Dependencies ──
 vendor/
 
-# ── PocketBase local data ──
-pb_data/
-pb_public/
-pb_hooks/*.js
+# ── Supabase ──
+supa.txt
 
 # ── Build ──
 /tmp/
