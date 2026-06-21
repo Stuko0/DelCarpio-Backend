@@ -3,67 +3,44 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"delcarpio/backend/internal/postgrest"
 )
 
 type RecipeHandler struct {
-	db *pgxpool.Pool
+	pg *postgrest.Client
 }
 
-func NewRecipeHandler(db *pgxpool.Pool) *RecipeHandler {
-	return &RecipeHandler{db: db}
+func NewRecipeHandler(pg *postgrest.Client) *RecipeHandler {
+	return &RecipeHandler{pg: pg}
 }
 
 func (h *RecipeHandler) List(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(r.Context(),
-		`SELECT id, title, slug, published, content_markdown, created, updated
-		 FROM recipes
-		 WHERE published = true
-		 ORDER BY created DESC
-		 LIMIT 50`)
-	if err != nil {
-		jsonError(w, "query failed", 500)
-		return
-	}
-	defer rows.Close()
+	filters := postgrest.ListFilters("*", "published", "true", "created", "desc", 50)
 
-	recipes, err := pgx.CollectRows(rows, pgx.RowToMap)
-	if err != nil {
-		jsonError(w, "collect failed", 500)
+	var recipes []map[string]interface{}
+	if err := h.pg.List(r.Context(), "recipes", filters, &recipes); err != nil {
+		jsonError(w, "query failed", 500)
 		return
 	}
 
 	if recipes == nil {
 		recipes = []map[string]interface{}{}
 	}
-
 	jsonOK(w, recipes)
 }
 
 func (h *RecipeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
+	filters := postgrest.ListFilters("*", "slug", slug, "created", "desc", 1)
 
-	rows, err := h.db.Query(r.Context(),
-		`SELECT id, title, slug, published, content_markdown, created, updated
-		 FROM recipes
-		 WHERE slug = $1
-		 LIMIT 1`, slug)
-	if err != nil {
-		jsonError(w, "query failed", 500)
-		return
-	}
-	defer rows.Close()
-
-	recipe, err := pgx.CollectOneRow(rows, pgx.RowToMap)
-	if err != nil {
-		if err == pgx.ErrNoRows {
+	var recipe map[string]interface{}
+	if err := h.pg.GetOne(r.Context(), "recipes", filters, &recipe); err != nil {
+		if err == postgrest.ErrNoRows {
 			jsonError(w, "recipe not found", 404)
 			return
 		}
-		jsonError(w, err.Error(), 500)
+		jsonError(w, "query failed", 500)
 		return
 	}
-
 	jsonOK(w, recipe)
 }

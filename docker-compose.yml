@@ -1,23 +1,6 @@
-# Local Postgres for development only.
-# Production uses Supabase cloud — Render deploys via Dockerfile.
-services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: delcarpio-db
-    restart: unless-stopped
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: delcarpio
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d delcarpio"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  pg_data:
+# Backend now uses Supabase PostgREST API (HTTPS) — no local DB needed.
+# Render deploys via Dockerfile.
+# 
+# To run locally:
+#   set -a && source .env && set +a
+#   go run ./cmd/serve/

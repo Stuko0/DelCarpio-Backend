@@ -3,22 +3,20 @@ package config
 import "os"
 
 type Config struct {
-	DatabaseURL       string
-	DatabaseDirectURL string
-	SupabaseURL       string
-	SupabaseAnonKey   string
-	SupabaseJWTSecret string
-	Port              string
+	SupabaseURL          string
+	SupabaseAnonKey      string
+	SupabaseServiceRole  string
+	SupabaseJWTSecret    string
+	Port                 string
 }
 
 func Load() *Config {
 	return &Config{
-		DatabaseURL:       getEnv("DATABASE_URL", ""),
-		DatabaseDirectURL: getEnv("DATABASE_DIRECT_URL", ""),
-		SupabaseURL:       getEnv("SUPABASE_URL", ""),
-		SupabaseAnonKey:   getEnv("SUPABASE_ANON_KEY", ""),
-		SupabaseJWTSecret: getEnv("SUPABASE_JWT_SECRET", ""),
-		Port:              getEnv("PORT", "8080"),
+		SupabaseURL:         getEnv("SUPABASE_URL", ""),
+		SupabaseAnonKey:     getEnv("SUPABASE_ANON_KEY", ""),
+		SupabaseServiceRole: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
+		SupabaseJWTSecret:   getEnv("SUPABASE_JWT_SECRET", ""),
+		Port:                getEnv("PORT", "8080"),
 	}
 }
 

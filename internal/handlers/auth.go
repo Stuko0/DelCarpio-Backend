@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func decodeJSON(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
+}
+
 type AuthHandler struct {
 	supabaseURL string
 	anonKey     string

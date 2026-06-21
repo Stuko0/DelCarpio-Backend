@@ -14,30 +14,27 @@ import (
 
 	"delcarpio/backend/internal/auth"
 	"delcarpio/backend/internal/config"
-	"delcarpio/backend/internal/db"
 	"delcarpio/backend/internal/handlers"
+	"delcarpio/backend/internal/postgrest"
 )
 
 func main() {
 	cfg := config.Load()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	pool, err := db.Connect(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("database connection failed: %v", err)
+	if cfg.SupabaseURL == "" || cfg.SupabaseServiceRole == "" {
+		log.Fatal("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required")
 	}
-	defer pool.Close()
+
+	pg := postgrest.New(cfg.SupabaseURL, cfg.SupabaseServiceRole)
 
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(corsMiddleware)
 
-	productHandler := handlers.NewProductHandler(pool)
-	recipeHandler := handlers.NewRecipeHandler(pool)
-	orderHandler := handlers.NewOrderHandler(pool)
+	productHandler := handlers.NewProductHandler(pg)
+	recipeHandler := handlers.NewRecipeHandler(pg)
+	orderHandler := handlers.NewOrderHandler(pg)
 	authHandler := handlers.NewAuthHandler(cfg.SupabaseURL, cfg.SupabaseAnonKey)
 
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -83,9 +80,9 @@ func main() {
 	<-quit
 
 	log.Println("shutting down…")
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	srv.Shutdown(shutdownCtx)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(ctx)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

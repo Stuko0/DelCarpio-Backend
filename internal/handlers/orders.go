@@ -1,21 +1,18 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"delcarpio/backend/internal/auth"
+	"delcarpio/backend/internal/postgrest"
 )
 
 type OrderHandler struct {
-	db *pgxpool.Pool
+	pg *postgrest.Client
 }
 
-func NewOrderHandler(db *pgxpool.Pool) *OrderHandler {
-	return &OrderHandler{db: db}
+func NewOrderHandler(pg *postgrest.Client) *OrderHandler {
+	return &OrderHandler{pg: pg}
 }
 
 type createOrderRequest struct {
@@ -30,33 +27,23 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(r, &req); err != nil {
 		jsonError(w, "invalid body", 400)
 		return
 	}
 
 	total := calculateTotal(req.Items)
 
-	itemsJSON, err := json.Marshal(req.Items)
-	if err != nil {
-		jsonError(w, "invalid items", 400)
-		return
+	payload := map[string]interface{}{
+		"user_id": userID,
+		"items":   req.Items,
+		"status":  "pending",
+		"total":   total,
 	}
 
-	rows, err := h.db.Query(r.Context(),
-		`INSERT INTO orders (user_id, items, status, total)
-		 VALUES ($1, $2, 'pending', $3)
-		 RETURNING id, user_id, items, status, total, created`,
-		userID, itemsJSON, total)
-	if err != nil {
-		jsonError(w, err.Error(), 500)
-		return
-	}
-	defer rows.Close()
-
-	created, err := pgx.CollectOneRow(rows, pgx.RowToMap)
-	if err != nil {
-		jsonError(w, err.Error(), 500)
+	var created map[string]interface{}
+	if err := h.pg.Create(r.Context(), "orders", payload, &created); err != nil {
+		jsonError(w, "create failed", 500)
 		return
 	}
 
@@ -70,28 +57,17 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(r.Context(),
-		`SELECT id, user_id, items, status, total, created
-		 FROM orders
-		 WHERE user_id = $1
-		 ORDER BY created DESC
-		 LIMIT 50`, userID)
-	if err != nil {
-		jsonError(w, "query failed", 500)
-		return
-	}
-	defer rows.Close()
+	filters := postgrest.ListFilters("*", "user_id", userID, "created", "desc", 50)
 
-	orders, err := pgx.CollectRows(rows, pgx.RowToMap)
-	if err != nil {
-		jsonError(w, "collect failed", 500)
+	var orders []map[string]interface{}
+	if err := h.pg.List(r.Context(), "orders", filters, &orders); err != nil {
+		jsonError(w, "query failed", 500)
 		return
 	}
 
 	if orders == nil {
 		orders = []map[string]interface{}{}
 	}
-
 	jsonOK(w, orders)
 }
 
