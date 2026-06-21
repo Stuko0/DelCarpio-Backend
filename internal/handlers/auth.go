@@ -25,6 +25,25 @@ func NewAuthHandler(supabaseURL, anonKey string) *AuthHandler {
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		jsonError(w, "cannot read body", 400)
+		return
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err == nil {
+		if opts, ok := data["options"].(map[string]interface{}); ok {
+			if d, ok := opts["data"].(map[string]interface{}); ok {
+				d["role"] = "customer"
+			}
+		}
+		modified, err := json.Marshal(data)
+		if err == nil {
+			r.Body = io.NopCloser(bytes.NewReader(modified))
+		}
+	}
+
 	h.proxyToSupabase(w, r, h.supabaseURL+"/auth/v1/signup")
 }
 
