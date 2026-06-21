@@ -1,59 +1,118 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
-	"strings"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/plugins/migratecmd"
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 
+	"delcarpio/backend/internal/auth"
+	"delcarpio/backend/internal/config"
+	"delcarpio/backend/internal/db"
 	"delcarpio/backend/internal/handlers"
-	"delcarpio/backend/internal/hooks"
 )
 
 func main() {
-	app := pocketbase.New()
+	cfg := config.Load()
 
-	// ── migrations ──
-	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
-		Automigrate: true,
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// ── hooks on serve ──
-	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		// CORS — allow Astro frontend
-		origins := getEnv("PB_ALLOWED_ORIGINS", "http://localhost:4321,http://localhost:5173")
-		se.Router.Bind(apis.CORS(apis.CORSConfig{
-			AllowOrigins: strings.Split(origins, ","),
-		}))
-
-		// Register module handlers
-		handlers.RegisterProducts(se, app)
-		handlers.RegisterRecipes(se, app)
-		handlers.RegisterOrders(se, app)
-
-		return se.Next()
-	})
-
-	// ── lifecycle hooks ──
-	hooks.RegisterProductHooks(app)
-	hooks.RegisterOrderHooks(app)
-
-	port := getEnv("PORT", "8090")
-	os.Args = []string{os.Args[0], "serve", "--http=0.0.0.0:" + port}
-
-	log.Printf("Del Carpio backend starting on :%s …", port)
-	if err := app.Start(); err != nil {
-		log.Fatal(err)
+	pool, err := db.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("database connection failed: %v", err)
 	}
+	defer pool.Close()
+
+	r := chi.NewRouter()
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
+	r.Use(corsMiddleware)
+
+	productHandler := handlers.NewProductHandler(pool)
+	recipeHandler := handlers.NewRecipeHandler(pool)
+	orderHandler := handlers.NewOrderHandler(pool)
+	authHandler := handlers.NewAuthHandler(cfg.SupabaseURL, cfg.SupabaseAnonKey)
+
+	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	r.Get("/api/products", productHandler.List)
+	r.Get("/api/products/{slug}", productHandler.Get)
+	r.Get("/api/recipes", recipeHandler.List)
+	r.Get("/api/recipes/{slug}", recipeHandler.Get)
+
+	r.Post("/api/auth/register", authHandler.Register)
+	r.Post("/api/auth/login", authHandler.Login)
+
+	r.Group(func(r chi.Router) {
+		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
+		r.Post("/api/orders", orderHandler.Create)
+		r.Get("/api/orders", orderHandler.List)
+	})
+
+	port := cfg.Port
+	if port == "" {
+		port = "8080"
+	}
+
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+	}
+
+	go func() {
+		log.Printf("Del Carpio backend starting on :%s …", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down…")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	srv.Shutdown(shutdownCtx)
 }
 
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		allowed := []string{
+			"http://localhost:4321",
+			"http://localhost:5173",
+			"https://delcarpio.vercel.app",
+		}
+		allow := false
+		for _, a := range allowed {
+			if origin == a {
+				allow = true
+				break
+			}
+		}
+		if allow {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

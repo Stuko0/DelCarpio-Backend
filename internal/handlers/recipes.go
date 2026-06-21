@@ -1,47 +1,69 @@
 package handlers
 
 import (
-	"database/sql"
+	"net/http"
 
-	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func RegisterRecipes(se *core.ServeEvent, app *pocketbase.PocketBase) {
-	se.Router.GET("/api/recipes", func(re *core.RequestEvent) error {
-		records, err := app.FindRecordsByFilter(
-			"recipes",
-			"published = true",
-			"-created",
-			50,
-			0,
-		)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return re.JSON(200, []map[string]any{})
-			}
-			return re.String(500, `{"error":"`+err.Error()+`"}`)
-		}
-		result := make([]map[string]any, 0, len(records))
-		for _, r := range records {
-			result = append(result, r.PublicExport())
-		}
-		return re.JSON(200, result)
-	})
+type RecipeHandler struct {
+	db *pgxpool.Pool
+}
 
-	se.Router.GET("/api/recipes/{slug}", func(re *core.RequestEvent) error {
-		slug := re.Request.PathValue("slug")
-		record, err := app.FindFirstRecordByFilter(
-			"recipes",
-			"slug = {:slug}",
-			map[string]any{"slug": slug},
-		)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return re.String(404, `{"error":"recipe not found"}`)
-			}
-			return re.String(500, `{"error":"`+err.Error()+`"}`)
+func NewRecipeHandler(db *pgxpool.Pool) *RecipeHandler {
+	return &RecipeHandler{db: db}
+}
+
+func (h *RecipeHandler) List(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(),
+		`SELECT id, title, slug, published, content_markdown, created, updated
+		 FROM recipes
+		 WHERE published = true
+		 ORDER BY created DESC
+		 LIMIT 50`)
+	if err != nil {
+		jsonError(w, "query failed", 500)
+		return
+	}
+	defer rows.Close()
+
+	recipes, err := pgx.CollectRows(rows, pgx.RowToMap)
+	if err != nil {
+		jsonError(w, "collect failed", 500)
+		return
+	}
+
+	if recipes == nil {
+		recipes = []map[string]interface{}{}
+	}
+
+	jsonOK(w, recipes)
+}
+
+func (h *RecipeHandler) Get(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+
+	rows, err := h.db.Query(r.Context(),
+		`SELECT id, title, slug, published, content_markdown, created, updated
+		 FROM recipes
+		 WHERE slug = $1
+		 LIMIT 1`, slug)
+	if err != nil {
+		jsonError(w, "query failed", 500)
+		return
+	}
+	defer rows.Close()
+
+	recipe, err := pgx.CollectOneRow(rows, pgx.RowToMap)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			jsonError(w, "recipe not found", 404)
+			return
 		}
-		return re.JSON(200, record.PublicExport())
-	})
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	jsonOK(w, recipe)
 }

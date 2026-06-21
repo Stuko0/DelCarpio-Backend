@@ -1,47 +1,69 @@
 package handlers
 
 import (
-	"database/sql"
+	"net/http"
 
-	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func RegisterProducts(se *core.ServeEvent, app *pocketbase.PocketBase) {
-	se.Router.GET("/api/products", func(re *core.RequestEvent) error {
-		records, err := app.FindRecordsByFilter(
-			"products",
-			"visible = true",
-			"-created",
-			50,
-			0,
-		)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return re.JSON(200, []map[string]any{})
-			}
-			return re.String(500, `{"error":"`+err.Error()+`"}`)
-		}
-		result := make([]map[string]any, 0, len(records))
-		for _, r := range records {
-			result = append(result, r.PublicExport())
-		}
-		return re.JSON(200, result)
-	})
+type ProductHandler struct {
+	db *pgxpool.Pool
+}
 
-	se.Router.GET("/api/products/{slug}", func(re *core.RequestEvent) error {
-		slug := re.Request.PathValue("slug")
-		record, err := app.FindFirstRecordByFilter(
-			"products",
-			"slug = {:slug}",
-			map[string]any{"slug": slug},
-		)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return re.String(404, `{"error":"product not found"}`)
-			}
-			return re.String(500, `{"error":"`+err.Error()+`"}`)
+func NewProductHandler(db *pgxpool.Pool) *ProductHandler {
+	return &ProductHandler{db: db}
+}
+
+func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(),
+		`SELECT id, name, slug, visible, created, updated
+		 FROM products
+		 WHERE visible = true
+		 ORDER BY created DESC
+		 LIMIT 50`)
+	if err != nil {
+		jsonError(w, "query failed", 500)
+		return
+	}
+	defer rows.Close()
+
+	products, err := pgx.CollectRows(rows, pgx.RowToMap)
+	if err != nil {
+		jsonError(w, "collect failed", 500)
+		return
+	}
+
+	if products == nil {
+		products = []map[string]interface{}{}
+	}
+
+	jsonOK(w, products)
+}
+
+func (h *ProductHandler) Get(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+
+	row, err := h.db.Query(r.Context(),
+		`SELECT id, name, slug, visible, created, updated
+		 FROM products
+		 WHERE slug = $1
+		 LIMIT 1`, slug)
+	if err != nil {
+		jsonError(w, "query failed", 500)
+		return
+	}
+	defer row.Close()
+
+	product, err := pgx.CollectOneRow(row, pgx.RowToMap)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			jsonError(w, "product not found", 404)
+			return
 		}
-		return re.JSON(200, record.PublicExport())
-	})
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	jsonOK(w, product)
 }

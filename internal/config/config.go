@@ -3,20 +3,22 @@ package config
 import "os"
 
 type Config struct {
-	Debug       bool
-	Port        string
-	AutoMigrate bool
-	CORSOrigins []string
-	PostgresURL string
+	DatabaseURL       string
+	DatabaseDirectURL string
+	SupabaseURL       string
+	SupabaseAnonKey   string
+	SupabaseJWTSecret string
+	Port              string
 }
 
 func Load() *Config {
 	return &Config{
-		Debug:       getEnv("PB_DEBUG", "false") == "true",
-		Port:        getEnv("PORT", "8090"),
-		AutoMigrate: getEnv("PB_AUTO_MIGRATE", "true") == "true",
-		CORSOrigins: []string{getEnv("PB_ALLOWED_ORIGINS", "http://localhost:4321,http://localhost:5173")},
-		PostgresURL: getEnv("POSTGRES_URL", "postgres://user:password@localhost:5432/delcarpio?sslmode=disable"),
+		DatabaseURL:       getEnv("DATABASE_URL", ""),
+		DatabaseDirectURL: getEnv("DATABASE_DIRECT_URL", ""),
+		SupabaseURL:       getEnv("SUPABASE_URL", ""),
+		SupabaseAnonKey:   getEnv("SUPABASE_ANON_KEY", ""),
+		SupabaseJWTSecret: getEnv("SUPABASE_JWT_SECRET", ""),
+		Port:              getEnv("PORT", "8080"),
 	}
 }
 
