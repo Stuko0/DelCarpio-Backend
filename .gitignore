@@ -1,0 +1,21 @@
+# ── Dependencies ──
+vendor/
+
+# ── PocketBase local data ──
+pb_data/
+pb_public/
+pb_hooks/*.js
+
+# ── Build ──
+/tmp/
+/serve
+/serve.exe
+
+# ── Env ──
+.env
+
+# ── IDE ──
+.idea/
+.vscode/
+*.swp
+*.swo
