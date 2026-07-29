@@ -37,6 +37,10 @@ func main() {
 	orderHandler := handlers.NewOrderHandler(pg)
 	authHandler := handlers.NewAuthHandler(cfg.SupabaseURL, cfg.SupabaseAnonKey)
 	profileHandler := handlers.NewProfileHandler(pg)
+	adminProductHandler := handlers.NewAdminProductHandler(pg)
+	adminOrderHandler := handlers.NewAdminOrderHandler(pg)
+	adminRecipeHandler := handlers.NewAdminRecipeHandler(pg)
+	adminStatsHandler := handlers.NewAdminStatsHandler(pg)
 
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -56,6 +60,23 @@ func main() {
 		r.Get("/api/orders", orderHandler.List)
 		r.Get("/api/profile", profileHandler.Get)
 		r.Put("/api/profile", profileHandler.Update)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
+		r.Use(auth.AdminMiddleware)
+		r.Get("/api/admin/products", adminProductHandler.List)
+		r.Post("/api/admin/products", adminProductHandler.Create)
+		r.Put("/api/admin/products/{slug}", adminProductHandler.Update)
+		r.Delete("/api/admin/products/{slug}", adminProductHandler.Delete)
+		r.Get("/api/admin/orders", adminOrderHandler.List)
+		r.Get("/api/admin/orders/{id}", adminOrderHandler.Get)
+		r.Put("/api/admin/orders/{id}/status", adminOrderHandler.UpdateStatus)
+		r.Get("/api/admin/recipes", adminRecipeHandler.List)
+		r.Post("/api/admin/recipes", adminRecipeHandler.Create)
+		r.Put("/api/admin/recipes/{slug}", adminRecipeHandler.Update)
+		r.Delete("/api/admin/recipes/{slug}", adminRecipeHandler.Delete)
+		r.Get("/api/admin/stats", adminStatsHandler.Stats)
 	})
 
 	port := cfg.Port
