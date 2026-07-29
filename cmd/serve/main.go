@@ -92,7 +92,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		allowed := []string{
 			"http://localhost:4321",
 			"http://localhost:5173",
-			"https://delcarpio.vercel.app",
+			"https://delcarpio.stuko.dev",
 		}
 		allow := false
 		for _, a := range allowed {
