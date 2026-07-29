@@ -7,16 +7,20 @@ type Config struct {
 	SupabaseAnonKey      string
 	SupabaseServiceRole  string
 	SupabaseJWTSecret    string
+	StripeSecretKey      string
+	StripeWebhookSecret  string
 	Port                 string
 }
 
 func Load() *Config {
 	return &Config{
-		SupabaseURL:         getEnv("SUPABASE_URL", ""),
-		SupabaseAnonKey:     getEnv("SUPABASE_ANON_KEY", ""),
-		SupabaseServiceRole: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
-		SupabaseJWTSecret:   getEnv("SUPABASE_JWT_SECRET", ""),
-		Port:                getEnv("PORT", "8080"),
+		SupabaseURL:          getEnv("SUPABASE_URL", ""),
+		SupabaseAnonKey:      getEnv("SUPABASE_ANON_KEY", ""),
+		SupabaseServiceRole:  getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
+		SupabaseJWTSecret:    getEnv("SUPABASE_JWT_SECRET", ""),
+		StripeSecretKey:      getEnv("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		Port:                 getEnv("PORT", "8080"),
 	}
 }
 

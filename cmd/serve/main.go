@@ -16,6 +16,7 @@ import (
 	"delcarpio/backend/internal/config"
 	"delcarpio/backend/internal/handlers"
 	"delcarpio/backend/internal/postgrest"
+	stripeclient "delcarpio/backend/internal/stripe"
 )
 
 func main() {
@@ -38,6 +39,14 @@ func main() {
 	authHandler := handlers.NewAuthHandler(cfg.SupabaseURL, cfg.SupabaseAnonKey)
 	profileHandler := handlers.NewProfileHandler(pg)
 	addressHandler := handlers.NewAddressHandler(pg)
+
+	var stripeClient *stripeclient.Client
+	if cfg.StripeSecretKey != "" {
+		stripeClient = stripeclient.New(cfg.StripeSecretKey)
+	}
+	paymentHandler := handlers.NewPaymentHandler(pg, stripeClient, handlers.PaymentConfig{
+		BaseURL: getBaseURL(),
+	})
 	adminProductHandler := handlers.NewAdminProductHandler(pg)
 	adminOrderHandler := handlers.NewAdminOrderHandler(pg)
 	adminRecipeHandler := handlers.NewAdminRecipeHandler(pg)
@@ -54,6 +63,7 @@ func main() {
 
 	r.Post("/api/auth/register", authHandler.Register)
 	r.Post("/api/auth/login", authHandler.Login)
+	r.Post("/api/payments/webhook", paymentHandler.Webhook)
 
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
@@ -67,6 +77,7 @@ func main() {
 		r.Post("/api/profile/addresses", addressHandler.Create)
 		r.Put("/api/profile/addresses/{id}", addressHandler.Update)
 		r.Delete("/api/profile/addresses/{id}", addressHandler.Delete)
+		r.Post("/api/payments/create-checkout", paymentHandler.CreateCheckout)
 	})
 
 	r.Group(func(r chi.Router) {
@@ -147,4 +158,11 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func getBaseURL() string {
+	if url := os.Getenv("BASE_URL"); url != "" {
+		return url
+	}
+	return "https://delcarpio-backend.onrender.com"
 }
