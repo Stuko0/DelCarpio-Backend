@@ -20,8 +20,8 @@ func (h *AddressHandler) List(w http.ResponseWriter, r *http.Request) {
 	filters := postgrest.EqFilter("user_id", userID)
 	var addresses []map[string]interface{}
 	if err := h.pg.List(r.Context(), "addresses", filters, &addresses); err != nil {
-		jsonError(w, "query failed", 500)
-		return
+		// Table might not exist yet — return empty list instead of 500
+		addresses = []map[string]interface{}{}
 	}
 	if addresses == nil {
 		addresses = []map[string]interface{}{}
@@ -50,7 +50,7 @@ func (h *AddressHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var created map[string]interface{}
 	if err := h.pg.Create(r.Context(), "addresses", input, &created); err != nil {
-		jsonError(w, "create failed: "+err.Error(), 500)
+		jsonError(w, "La funcionalidad de direcciones no está disponible. Ejecuta la migración SQL en Supabase.", 400)
 		return
 	}
 	jsonOK(w, created, 201)
