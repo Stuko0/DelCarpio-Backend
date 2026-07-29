@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"delcarpio/backend/internal/postgrest"
 )
@@ -16,6 +17,59 @@ func NewProductHandler(pg *postgrest.Client) *ProductHandler {
 
 func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
 	filters := postgrest.ListFilters("*", "visible", "true", "created", "desc", 50)
+
+	// Apply query params
+	q := r.URL.Query()
+
+	// Category filter
+	if cat := q.Get("category"); cat != "" {
+		filters.Set("category", "eq."+cat)
+	}
+
+	// Search by name (PostgREST ILIKE)
+	if search := q.Get("q"); search != "" {
+		filters.Set("name", "ilike.*"+search+"*")
+	}
+
+	// Price range
+	if minP := q.Get("min_price"); minP != "" {
+		filters.Set("price", "gte."+minP)
+	}
+	if maxP := q.Get("max_price"); maxP != "" {
+		filters.Set("price", "lte."+maxP)
+	}
+
+	// Sort
+	if sort := q.Get("sort"); sort != "" {
+		switch sort {
+		case "price_asc":
+			filters.Set("order", "price.asc")
+		case "price_desc":
+			filters.Set("order", "price.desc")
+		case "name_asc":
+			filters.Set("order", "name.asc")
+		case "name_desc":
+			filters.Set("order", "name.desc")
+		case "newest":
+			filters.Set("order", "created.desc")
+		}
+	}
+
+	// Pagination
+	if page := q.Get("page"); page != "" {
+		if limit := q.Get("limit"); limit != "" {
+			p, _ := strconv.Atoi(page)
+			l, _ := strconv.Atoi(limit)
+			if p < 1 {
+				p = 1
+			}
+			if l < 1 || l > 100 {
+				l = 50
+			}
+			filters.Set("offset", strconv.Itoa((p-1)*l))
+			filters.Set("limit", strconv.Itoa(l))
+		}
+	}
 
 	var products []map[string]interface{}
 	if err := h.pg.List(r.Context(), "products", filters, &products); err != nil {

@@ -71,6 +71,82 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, orders)
 }
 
+func (h *OrderHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID := auth.GetUserID(r)
+	id := r.PathValue("id")
+	if id == "" {
+		jsonError(w, "id required", 400)
+		return
+	}
+
+	filters := postgrest.EqFilter("id", id)
+	var order map[string]interface{}
+	if err := h.pg.GetOne(r.Context(), "orders", filters, &order); err != nil {
+		if err == postgrest.ErrNoRows {
+			jsonError(w, "order not found", 404)
+			return
+		}
+		jsonError(w, "query failed", 500)
+		return
+	}
+
+	// Verify ownership
+	ownerID, _ := order["user_id"].(string)
+	if ownerID != userID {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+
+	jsonOK(w, order)
+}
+
+func (h *OrderHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	userID := auth.GetUserID(r)
+	id := r.PathValue("id")
+	if id == "" {
+		jsonError(w, "id required", 400)
+		return
+	}
+
+	filters := postgrest.EqFilter("id", id)
+	var order map[string]interface{}
+	if err := h.pg.GetOne(r.Context(), "orders", filters, &order); err != nil {
+		if err == postgrest.ErrNoRows {
+			jsonError(w, "order not found", 404)
+			return
+		}
+		jsonError(w, "query failed", 500)
+		return
+	}
+
+	ownerID, _ := order["user_id"].(string)
+	if ownerID != userID {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+
+	status, _ := order["status"].(string)
+	if status != "pending" {
+		jsonError(w, "only pending orders can be cancelled", 400)
+		return
+	}
+
+	var result []map[string]interface{}
+	if err := h.pg.Update(r.Context(), "orders", filters, map[string]interface{}{
+		"status":  "cancelled",
+		"updated": "now()",
+	}, &result); err != nil {
+		jsonError(w, "cancel failed: "+err.Error(), 500)
+		return
+	}
+
+	if len(result) > 0 {
+		jsonOK(w, result[0])
+	} else {
+		jsonOK(w, map[string]interface{}{"status": "cancelled"})
+	}
+}
+
 func calculateTotal(items []map[string]interface{}) float64 {
 	var total float64
 	for _, item := range items {

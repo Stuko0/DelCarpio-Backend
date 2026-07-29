@@ -37,6 +37,7 @@ func main() {
 	orderHandler := handlers.NewOrderHandler(pg)
 	authHandler := handlers.NewAuthHandler(cfg.SupabaseURL, cfg.SupabaseAnonKey)
 	profileHandler := handlers.NewProfileHandler(pg)
+	addressHandler := handlers.NewAddressHandler(pg)
 	adminProductHandler := handlers.NewAdminProductHandler(pg)
 	adminOrderHandler := handlers.NewAdminOrderHandler(pg)
 	adminRecipeHandler := handlers.NewAdminRecipeHandler(pg)
@@ -58,8 +59,14 @@ func main() {
 		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
 		r.Post("/api/orders", orderHandler.Create)
 		r.Get("/api/orders", orderHandler.List)
+		r.Get("/api/orders/{id}", orderHandler.Get)
+		r.Post("/api/orders/{id}/cancel", orderHandler.Cancel)
 		r.Get("/api/profile", profileHandler.Get)
 		r.Put("/api/profile", profileHandler.Update)
+		r.Get("/api/profile/addresses", addressHandler.List)
+		r.Post("/api/profile/addresses", addressHandler.Create)
+		r.Put("/api/profile/addresses/{id}", addressHandler.Update)
+		r.Delete("/api/profile/addresses/{id}", addressHandler.Delete)
 	})
 
 	r.Group(func(r chi.Router) {
