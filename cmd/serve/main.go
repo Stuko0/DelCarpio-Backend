@@ -36,6 +36,7 @@ func main() {
 	recipeHandler := handlers.NewRecipeHandler(pg)
 	orderHandler := handlers.NewOrderHandler(pg)
 	authHandler := handlers.NewAuthHandler(cfg.SupabaseURL, cfg.SupabaseAnonKey)
+	profileHandler := handlers.NewProfileHandler(pg)
 
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -53,6 +54,8 @@ func main() {
 		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
 		r.Post("/api/orders", orderHandler.Create)
 		r.Get("/api/orders", orderHandler.List)
+		r.Get("/api/profile", profileHandler.Get)
+		r.Put("/api/profile", profileHandler.Update)
 	})
 
 	port := cfg.Port

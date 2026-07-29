@@ -114,6 +114,37 @@ func (c *Client) Create(ctx context.Context, table string, payload interface{}, 
 	return nil
 }
 
+func (c *Client) Update(ctx context.Context, table string, filters url.Values, payload interface{}, result interface{}) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	u := c.baseURL + "/" + table + "?" + filters.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, u, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	c.setHeaders(req, [2]string{"Prefer", "return=representation"})
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("postgrest: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("postgrest %s: %s", resp.Status, string(respBody))
+	}
+	if result != nil {
+		return json.Unmarshal(respBody, result)
+	}
+	return nil
+}
+
 var ErrNoRows = fmt.Errorf("no rows")
 
 func EqFilter(col, val string) url.Values {
