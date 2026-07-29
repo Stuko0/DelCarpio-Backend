@@ -66,7 +66,7 @@ func main() {
 	r.Post("/api/payments/webhook", paymentHandler.Webhook)
 
 	r.Group(func(r chi.Router) {
-		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
+		r.Use(auth.Middleware(cfg.SupabaseURL, cfg.SupabaseAnonKey))
 		r.Post("/api/orders", orderHandler.Create)
 		r.Get("/api/orders", orderHandler.List)
 		r.Get("/api/orders/{id}", orderHandler.Get)
@@ -81,8 +81,8 @@ func main() {
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(auth.Middleware(cfg.SupabaseJWTSecret))
-		r.Use(auth.AdminMiddleware)
+		r.Use(auth.Middleware(cfg.SupabaseURL, cfg.SupabaseAnonKey))
+		r.Use(auth.AdminMiddleware(cfg.SupabaseURL, cfg.SupabaseAnonKey))
 		r.Get("/api/admin/products", adminProductHandler.List)
 		r.Post("/api/admin/products", adminProductHandler.Create)
 		r.Put("/api/admin/products/{slug}", adminProductHandler.Update)
