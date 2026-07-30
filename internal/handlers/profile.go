@@ -24,8 +24,8 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filters := postgrest.EqFilter("user_id", userID)
-	var profile map[string]interface{}
-	err := h.pg.GetOne(r.Context(), "profiles", filters, &profile)
+	var user map[string]interface{}
+	err := h.pg.GetOne(r.Context(), "users", filters, &user)
 	if err == postgrest.ErrNoRows {
 		jsonOK(w, map[string]interface{}{
 			"user_id": userID,
@@ -34,6 +34,7 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 			"phone":   "",
 			"address": "",
 			"city":    "",
+			"role":    "customer",
 		})
 		return
 	}
@@ -41,7 +42,7 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "query failed", 500)
 		return
 	}
-	jsonOK(w, profile)
+	jsonOK(w, user)
 }
 
 func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +58,11 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed := map[string]bool{"name": true, "email": true, "phone": true, "address": true, "city": true}
+	// Only admin can change role
+	allowed := map[string]bool{"name": true, "email": true, "phone": true, "address": true, "city": true, "avatar_url": true}
+	if r.Header.Get("X-Admin-Role") == "admin" {
+		allowed["role"] = true
+	}
 	clean := make(map[string]interface{})
 	for k, v := range updates {
 		if allowed[k] {
@@ -70,15 +75,13 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	clean["updated"] = time.Now().UTC().Format(time.RFC3339)
 
-	// Upsert: check if profile exists, PATCH if yes, POST if no
 	filters := postgrest.EqFilter("user_id", userID)
 	var existing map[string]interface{}
-	err := h.pg.GetOne(r.Context(), "profiles", filters, &existing)
+	err := h.pg.GetOne(r.Context(), "users", filters, &existing)
 
 	if err == nil {
-		// Exists → PATCH
 		var result []map[string]interface{}
-		if err := h.pg.Update(r.Context(), "profiles", filters, clean, &result); err != nil {
+		if err := h.pg.Update(r.Context(), "users", filters, clean, &result); err != nil {
 			jsonError(w, "update failed: "+err.Error(), 500)
 			return
 		}
@@ -88,10 +91,9 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 			jsonOK(w, clean)
 		}
 	} else {
-		// Doesn't exist → POST (create)
 		clean["user_id"] = userID
 		var created map[string]interface{}
-		if err := h.pg.Create(r.Context(), "profiles", clean, &created); err != nil {
+		if err := h.pg.Create(r.Context(), "users", clean, &created); err != nil {
 			jsonError(w, "create failed: "+err.Error(), 500)
 			return
 		}

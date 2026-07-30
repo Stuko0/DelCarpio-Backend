@@ -19,7 +19,7 @@ func (h *AdminStatsHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	stats := map[string]interface{}{
 		"products": h.count(r.Context(), "products"),
 		"orders":   h.count(r.Context(), "orders"),
-		"profiles": h.count(r.Context(), "profiles"),
+		"users": h.count(r.Context(), "users"),
 		"recipes":  h.count(r.Context(), "recipes"),
 	}
 	jsonOK(w, stats)
