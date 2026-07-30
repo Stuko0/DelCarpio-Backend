@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"delcarpio/backend/internal/auth"
 	"delcarpio/backend/internal/postgrest"
@@ -56,11 +59,13 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin can change role
+	// Extract caller role from JWT
+	callerRole := getRoleFromJWT(r)
 	allowed := map[string]bool{"name": true, "email": true, "phone": true, "avatar_url": true}
-	if r.Header.Get("X-Admin-Role") == "admin" {
+	if callerRole == "admin" || callerRole == "owner" {
 		allowed["role"] = true
 	}
+
 	clean := make(map[string]interface{})
 	for k, v := range updates {
 		if allowed[k] {
@@ -97,4 +102,25 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonOK(w, created, 201)
 	}
+}
+
+func getRoleFromJWT(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return ""
+	}
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Parse without verification just to read claims
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return ""
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return ""
+	}
+	meta, _ := claims["user_metadata"].(map[string]interface{})
+	role, _ := meta["role"].(string)
+	return role
 }
