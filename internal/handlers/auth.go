@@ -55,6 +55,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	h.proxyToSupabase(w, r, h.supabaseURL+"/auth/v1/token?grant_type=password")
 }
 
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	h.proxyToSupabase(w, r, h.supabaseURL+"/auth/v1/token?grant_type=refresh_token")
+}
+
 func (h *AuthHandler) proxyToSupabase(w http.ResponseWriter, r *http.Request, target string) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

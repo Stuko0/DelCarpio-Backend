@@ -63,6 +63,7 @@ func main() {
 
 	r.Post("/api/auth/register", authHandler.Register)
 	r.Post("/api/auth/login", authHandler.Login)
+	r.Post("/api/auth/refresh", authHandler.Refresh)
 	r.Post("/api/payments/webhook", paymentHandler.Webhook)
 
 	r.Group(func(r chi.Router) {
