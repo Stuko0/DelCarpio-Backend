@@ -92,7 +92,7 @@ func AdminMiddleware(supabaseURL, anonKey string) func(http.Handler) http.Handle
 				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 				return
 			}
-			if role != "admin" {
+			if role != "admin" && role != "owner" {
 				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 				return
 			}

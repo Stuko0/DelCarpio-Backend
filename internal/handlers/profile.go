@@ -32,8 +32,6 @@ func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 			"name":    "",
 			"email":   "",
 			"phone":   "",
-			"address": "",
-			"city":    "",
 			"role":    "customer",
 		})
 		return
@@ -59,7 +57,7 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Only admin can change role
-	allowed := map[string]bool{"name": true, "email": true, "phone": true, "address": true, "city": true, "avatar_url": true}
+	allowed := map[string]bool{"name": true, "email": true, "phone": true, "avatar_url": true}
 	if r.Header.Get("X-Admin-Role") == "admin" {
 		allowed["role"] = true
 	}
