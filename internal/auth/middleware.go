@@ -109,6 +109,15 @@ type userResponseFull struct {
 }
 
 func validateWithRole(client *http.Client, supabaseURL, anonKey, token string) (string, string, error) {
+	// First try: validate via Supabase Auth API
+	userID, role, err := validateWithSupabaseFull(client, supabaseURL, anonKey, token)
+	if err == nil && userID != "" {
+		return userID, role, nil
+	}
+	return "", "", fmt.Errorf("unauthorized")
+}
+
+func validateWithSupabaseFull(client *http.Client, supabaseURL, anonKey, token string) (string, string, error) {
 	req, err := http.NewRequest(http.MethodGet, supabaseURL+"/auth/v1/user", nil)
 	if err != nil {
 		return "", "", fmt.Errorf("request: %w", err)
