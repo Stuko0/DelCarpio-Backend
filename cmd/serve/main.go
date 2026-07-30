@@ -51,6 +51,7 @@ func main() {
 	adminOrderHandler := handlers.NewAdminOrderHandler(pg)
 	adminRecipeHandler := handlers.NewAdminRecipeHandler(pg)
 	adminStatsHandler := handlers.NewAdminStatsHandler(pg)
+	adminGenericHandler := handlers.NewAdminGenericHandler(pg)
 
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -96,6 +97,27 @@ func main() {
 		r.Put("/api/admin/recipes/{slug}", adminRecipeHandler.Update)
 		r.Delete("/api/admin/recipes/{slug}", adminRecipeHandler.Delete)
 		r.Get("/api/admin/stats", adminStatsHandler.Stats)
+
+		// Generic CRUD for new tables
+		tables := map[string]string{
+			"categories":           "id",
+			"product_variants":     "id",
+			"product_images":       "id",
+			"raw_materials":        "id",
+			"suppliers":            "id",
+			"purchase_orders":      "id",
+			"production_batches":   "id",
+			"expense_categories":   "id",
+			"expenses":             "id",
+			"inventory_movements":  "id",
+		}
+		for table, idField := range tables {
+			r.Get("/api/admin/"+table, adminGenericHandler.ListAll(table))
+			r.Get("/api/admin/"+table+"/{id}", adminGenericHandler.GetOne(table, idField))
+			r.Post("/api/admin/"+table, adminGenericHandler.Create(table))
+			r.Put("/api/admin/"+table+"/{id}", adminGenericHandler.Update(table, idField))
+			r.Delete("/api/admin/"+table+"/{id}", adminGenericHandler.Delete(table, idField))
+		}
 	})
 
 	port := cfg.Port
